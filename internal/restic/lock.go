@@ -64,14 +64,28 @@ func IsAlreadyLocked(err error) bool {
 // exclusive lock is already held by another process, ErrAlreadyLocked is
 // returned.
 func NewLock(ctx context.Context, repo Repository) (*Lock, error) {
-	return newLock(ctx, repo, false)
+	return newLock(ctx, repo, false, false)
 }
 
 // NewExclusiveLock returns a new, exclusive lock for the repository. If
 // another lock (normal and exclusive) is already held by another process,
 // ErrAlreadyLocked is returned.
 func NewExclusiveLock(ctx context.Context, repo Repository) (*Lock, error) {
-	return newLock(ctx, repo, true)
+	return newLock(ctx, repo, true, false)
+}
+
+// NewStaleLock returns a new, stale, non-exclusive lock for the repository.
+// If an exclusive lock is already held by another process, ErrAlreadyLocked
+// is returned.
+func NewStaleLock(ctx context.Context, repo Repository) (*Lock, error) {
+	return newLock(ctx, repo, false, true)
+}
+
+// NewStaleExclusiveLock returns a new, stale, exclusive lock for the
+// repository. If another lock (normal and exclusive) is already held by
+// another process, ErrAlreadyLocked is returned.
+func NewStaleExclusiveLock(ctx context.Context, repo Repository) (*Lock, error) {
+	return newLock(ctx, repo, true, true)
 }
 
 var waitBeforeLockCheck = 200 * time.Millisecond
@@ -82,12 +96,15 @@ func TestSetLockTimeout(t testing.TB, d time.Duration) {
 	waitBeforeLockCheck = d
 }
 
-func newLock(ctx context.Context, repo Repository, excl bool) (*Lock, error) {
+func newLock(ctx context.Context, repo Repository, excl, stale bool) (*Lock, error) {
 	lock := &Lock{
 		Time:      time.Now(),
 		PID:       os.Getpid(),
 		Exclusive: excl,
 		repo:      repo,
+	}
+	if stale {
+		lock.Time = lock.Time.Add(-2 * staleTimeout)
 	}
 
 	hn, err := os.Hostname()
