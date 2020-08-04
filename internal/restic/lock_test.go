@@ -262,3 +262,67 @@ func TestLockRefresh(t *testing.T) {
 		"expected a later timestamp after lock refresh")
 	rtest.OK(t, lock.Unlock())
 }
+
+func TestNewStaleLock(t *testing.T) {
+	repo, cleanup := repository.TestRepository(t)
+	defer cleanup()
+
+	_, err := restic.NewStaleLock(context.TODO(), repo)
+	rtest.OK(t, err)
+
+	count := 0
+	err = repo.List(context.TODO(), restic.LockFile, func(id restic.ID, size int64) error {
+		count++
+		return nil
+	})
+	rtest.OK(t, err)
+	rtest.Assert(t, count == 1,
+		"stale lock does not exist after NewStaleLock was called")
+
+	rtest.OK(t, restic.RemoveStaleLocks(context.TODO(), repo))
+
+	count = 0
+	err = repo.List(context.TODO(), restic.LockFile, func(id restic.ID, size int64) error {
+		count++
+		return nil
+	})
+	rtest.OK(t, err)
+	rtest.Assert(t, count == 0,
+		"stale lock still exists after RemoveStaleLocks was called")
+
+	_, err = restic.NewStaleExclusiveLock(context.TODO(), repo)
+	rtest.OK(t, err)
+
+}
+
+func TestNewStaleExclusiveLock(t *testing.T) {
+	repo, cleanup := repository.TestRepository(t)
+	defer cleanup()
+
+	_, err := restic.NewStaleExclusiveLock(context.TODO(), repo)
+	rtest.OK(t, err)
+
+	count := 0
+	err = repo.List(context.TODO(), restic.LockFile, func(id restic.ID, size int64) error {
+		count++
+		return nil
+	})
+	rtest.OK(t, err)
+	rtest.Assert(t, count == 1,
+		"stale lock does not exist after NewStaleExclusiveLock was called")
+
+	rtest.OK(t, restic.RemoveStaleLocks(context.TODO(), repo))
+
+	count = 0
+	err = repo.List(context.TODO(), restic.LockFile, func(id restic.ID, size int64) error {
+		count++
+		return nil
+	})
+	rtest.OK(t, err)
+	rtest.Assert(t, count == 0,
+		"stale exclusive lock still exists after RemoveStaleLocks was called")
+
+	_, err = restic.NewStaleExclusiveLock(context.TODO(), repo)
+	rtest.OK(t, err)
+
+}

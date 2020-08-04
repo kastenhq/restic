@@ -34,9 +34,29 @@ is used for debugging purposes only.`,
 	},
 }
 
+var cmdDebugLockStale = &cobra.Command{
+	Use:   "lock-stale",
+	Short: "Create stale lock in repository",
+	Long: `
+The "lock-stale" command creates a stale lock in the repository.  It
+is used for testing purposes only.`,
+	DisableAutoGenTag: true,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return runDebugLockStale(debugLockStaleOptions, globalOptions)
+	},
+}
+
+type DebugLockStaleOptions struct {
+	Exclusive bool
+}
+
+var debugLockStaleOptions DebugLockStaleOptions
+
 func init() {
 	cmdRoot.AddCommand(cmdDebug)
 	cmdDebug.AddCommand(cmdDebugDump)
+	cmdDebug.AddCommand(cmdDebugLockStale)
+	cmdDebugLockStale.Flags().BoolVar(&debugLockStaleOptions.Exclusive, "exclusive", false, "create stale exclusive lock")
 }
 
 func prettyPrintJSON(wr io.Writer, item interface{}) error {
@@ -169,4 +189,24 @@ func runDebugDump(gopts GlobalOptions, args []string) error {
 	default:
 		return errors.Fatalf("no such type %q", tpe)
 	}
+}
+
+func runDebugLockStale(opts DebugLockStaleOptions, gopts GlobalOptions) error {
+	repo, err := OpenRepository(gopts)
+	if err != nil {
+		return err
+	}
+
+	fn := restic.NewStaleLock
+	if opts.Exclusive {
+		fn = restic.NewStaleExclusiveLock
+	}
+
+	_, err = fn(gopts.ctx, repo)
+	if err != nil {
+		return err
+	}
+
+	Verbosef("successfully created stale lock\n")
+	return nil
 }
